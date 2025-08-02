@@ -15,7 +15,7 @@
    cd ssl-cert-checker
 
 2. 安装依赖：
-   bashDownloadCopy code Wrappip install -r requirements.txt
+   pip install -r requirements.txt
 
 3. 配置 config.ini：
 
