@@ -7,28 +7,26 @@ import requests
 # --- 配置 ---
 # 从环境变量获取所有配置
 BARK_KEY = os.environ.get('BARK_KEY')
-# 自建 Bark 服务器地址，如果未设置，则默认为官方服务器
 BARK_URL = os.environ.get('BARK_URL', 'https://api.day.app').rstrip('/')
-# 从环境变量获取以逗号分隔的域名字符串
 DOMAINS_STR = os.environ.get('DOMAINS')
-# 证书过期提醒阈值（天）
 DAYS_THRESHOLD = int(os.environ.get('DAYS_THRESHOLD', 30))
+DEFAULT_PORT = 443 # <--- 新增：定义默认端口
 
-
-def get_cert_expiry_date(hostname: str) -> datetime.datetime | None:
-    """获取指定域名的 SSL 证书过期日期"""
+def get_cert_expiry_date(hostname: str, port: int) -> datetime.datetime | None: # <--- 修改：增加 port 参数
+    """获取指定主机和端口的 SSL 证书过期日期"""
     context = ssl.create_default_context()
     try:
-        with socket.create_connection((hostname, 443), timeout=10) as sock:
+        # <--- 修改：使用传入的 hostname 和 port
+        with socket.create_connection((hostname, port), timeout=10) as sock:
             with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                 cert = ssock.getpeercert()
                 expiry_date_str = cert['notAfter']
                 return datetime.datetime.strptime(expiry_date_str, '%b %d %H:%M:%S %Y %Z')
     except (socket.gaierror, socket.timeout, ssl.SSLError, ConnectionRefusedError) as e:
-        print(f"❌ 无法连接到 {hostname}: {e}")
+        print(f"❌ 无法连接到 {hostname}:{port}: {e}") # <--- 修改：打印端口
         return None
     except Exception as e:
-        print(f"❌ 检查 {hostname} 时发生未知错误: {e}")
+        print(f"❌ 检查 {hostname}:{port} 时发生未知错误: {e}") # <--- 修改：打印端口
         return None
 
 def send_bark_notification(title: str, body: str, bark_key: str):
@@ -37,7 +35,6 @@ def send_bark_notification(title: str, body: str, bark_key: str):
         print("❗ 未配置 Bark Key，跳过通知。")
         return
 
-    # 组合成最终的 Bark API URL
     url = f"{BARK_URL}/{bark_key}/{title}/{body}?icon=https://raw.githubusercontent.com/google/material-design-icons/master/png/action/https/materialicons/48dp/1x/baseline_https_black_48dp.png"
     
     try:
@@ -53,58 +50,64 @@ def main():
     """主函数"""
     print("🚀 开始检测 SSL 证书有效期...")
     
-    if not BARK_KEY:
-        print("🔴 错误: 环境变量 BARK_KEY 未设置，将无法发送 Bark 通知。")
-        # 如果没有key，脚本运行没有意义，可以直接退出
-        return
-
-    if not DOMAINS_STR:
-        print("🔴 错误: 环境变量 DOMAINS 未设置或为空，没有可检测的域名。")
+    if not BARK_KEY or not DOMAINS_STR:
+        print("🔴 错误: 环境变量 BARK_KEY 和 DOMAINS 必须设置。")
         return
         
-    # 解析以逗号分隔的域名列表
-    domains = [domain.strip() for domain in DOMAINS_STR.split(',') if domain.strip()]
-    if not domains:
+    # <--- 修改：domain_entries 保存原始的 "域名:端口" 字符串
+    domain_entries = [d.strip() for d in DOMAINS_STR.split(',') if d.strip()]
+    if not domain_entries:
         print("🔴 错误: 从环境变量 DOMAINS 中未解析出有效域名。")
         return
 
-    print(f"🔍 将检测以下 {len(domains)} 个域名 (从环境变量获取)，阈值为 {DAYS_THRESHOLD} 天:")
-    for domain in domains:
-        print(f"  - {domain}")
+    print(f"🔍 将检测以下 {len(domain_entries)} 个条目，阈值为 {DAYS_THRESHOLD} 天:")
+    for entry in domain_entries:
+        print(f"  - {entry}")
     
     print("-" * 20)
 
     expiring_soon_count = 0
-    for domain in domains:
-        expiry_date = get_cert_expiry_date(domain)
+    # <--- 修改：循环处理每个条目
+    for entry in domain_entries:
+        # 解析域名和端口
+        if ':' in entry:
+            parts = entry.rsplit(':', 1) # 使用 rsplit 从右边分割，避免 IPv6 地址问题
+            hostname = parts[0]
+            try:
+                port = int(parts[1])
+            except ValueError:
+                print(f"🟡 警告: '{entry}' 中的端口无效，跳过此条目。")
+                continue
+        else:
+            hostname = entry
+            port = DEFAULT_PORT
+            
+        # 开始检测
+        expiry_date = get_cert_expiry_date(hostname, port)
         if expiry_date:
             now = datetime.datetime.now()
-            time_remaining = expiry_date - now
-            days_left = time_remaining.days
+            days_left = (expiry_date - now).days
 
             if days_left < 0:
-                print(f"🔴 {domain} - 证书已过期 {abs(days_left)} 天！")
+                print(f"🔴 {entry} - 证书已过期 {abs(days_left)} 天！")
                 title = f"SSL证书已过期⚠️"
-                body = f"{domain} 的证书已于 {expiry_date.strftime('%Y-%m-%d')} 过期！"
+                body = f"域名 {entry} 的证书已于 {expiry_date.strftime('%Y-%m-%d')} 过期！"
                 send_bark_notification(title, body, BARK_KEY)
                 expiring_soon_count += 1
             elif days_left <= DAYS_THRESHOLD:
-                print(f"🟠 {domain} - 证书将在 {days_left} 天后过期 (日期: {expiry_date.strftime('%Y-%m-%d')})")
+                print(f"🟠 {entry} - 证书将在 {days_left} 天后过期 (日期: {expiry_date.strftime('%Y-%m-%d')})")
                 title = f"SSL证书即将过期提醒"
-                body = f"{domain} 的证书将在 {days_left} 天后过期，请及时续签！"
+                body = f"域名 {entry} 的证书将在 {days_left} 天后过期，请及时续签！"
                 send_bark_notification(title, body, BARK_KEY)
                 expiring_soon_count += 1
             else:
-                print(f"🟢 {domain} - 正常，剩余 {days_left} 天。")
+                print(f"🟢 {entry} - 正常，剩余 {days_left} 天。")
     
     print("-" * 20)
     if expiring_soon_count == 0:
         print("🎉 所有证书状态良好！")
-        # 可以选择在一切正常时也发一条通知
-        # send_bark_notification("SSL证书检测报告", f"所有 {len(domains)} 个证书均状态良好。", BARK_KEY)
     else:
         print(f"🚨 共发现 {expiring_soon_count} 个证书需要关注。")
-
 
 if __name__ == "__main__":
     main()
