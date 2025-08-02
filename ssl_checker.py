@@ -114,8 +114,8 @@ def main():
             send_bark_notification(config,
                                    f"⚠️ {domain} 证书即将过期",
                                    f"剩余 {delta} 天 (过期时间: {expiry.strftime('%Y-%m-%d %H:%M')} UTC)")
-        # else:
-        #     print(f"    {domain} 证书有效，距离过期还有较长时间。")
+        else:
+             print(f"    {domain} 证书有效，距离过期还有较长时间。")
 
 
 if __name__ == "__main__":
