@@ -47,13 +47,4 @@ DOMAINS: 需要检查的域名列表。使用竖线 | 分隔每个域名，并�
 点击 "Run workflow" 按钮   
 
 # 仓库结构
-ssl-cert-checker/
-│
-├── .github/
-│   └── workflows/
-│       └── ssl_check.yml
-├── README.md
-├── requirements.txt
-├── config.example.ini
-├── ssl_checker.py
-└── run_checks.sh
+![微信截图_20250802103556](https://github.com/user-attachments/assets/53610651-fab5-4376-ab95-7a7ca3b0556d)
