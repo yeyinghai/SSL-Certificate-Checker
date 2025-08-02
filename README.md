@@ -1,0 +1,2 @@
+# SSL Certificate Checker
+这是一个Python脚本，用于检测指定网站的SSL证书有效期，并在证书即将过期时通过自建Bark服务器推送通知
