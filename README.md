@@ -5,8 +5,7 @@
 ### **项目结构 **
 
 ```
-.
-├── .github
+├── github
 │   └── workflows
 │       └── check.yml        # GitHub Actions 配置文件
 ├── check_ssl.py             # 核心检测和通知脚本 
@@ -77,8 +76,8 @@
 
 ## 📝 本地运行
 
-1.  克隆你的仓库: `git clone https://github.com/YourUsername/your-repo-name.git`
-2.  进入目录: `cd your-repo-name`
+1.  克隆仓库: `git clone https://github.com/yeyinghai/SSL-Certificate-Checker.git`
+2.  进入目录: `cd SSL-Certificate-Checker`
 3.  安装依赖: `pip install -r requirements.txt`
 4.  设置环境变量并运行:
     ```bash
